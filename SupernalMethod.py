@@ -1,6 +1,5 @@
-def Supernal(c,a,b,l):
-    
-    
+def SupernalEff(c,a,b):
+        
     n = len(c[0])
     
     NDF = []
@@ -22,10 +21,12 @@ def Supernal(c,a,b,l):
     cons = len(a[0])
     
     if J == 2:
-        regions1 = [[0,0]]
+        supernal = [0,0]
     
     elif J == 3:
-        regions1 = [[0,0,0]]
+        supernal = [0,0,0]
+        
+    regions1 = [supernal]
     regions2 = []
     
     m = gp.Model("Supernal Method")
@@ -51,33 +52,32 @@ def Supernal(c,a,b,l):
     
     
     if J == 3:
-        l = [0.7,0.2,0.1]
+        l = [0.33,0.33,0.34]
         m.setObjective((gp.quicksum(x[i]*c[i] for i in Items)*l[0] + gp.quicksum(x[i]*c[i+n] for i in Items)*l[1] + gp.quicksum(x[i]*c[i+n*2] for i in Items)*l[2]), GRB.MINIMIZE)
         m.addConstr(gp.quicksum(x[i]*c[i+2*n] for i in Items) <= 0, name = "z3")
     
     elif J ==2:
-        l = l
+        l = [0.5,0.5]
         m.setObjective((gp.quicksum(x[i]*c[i] for i in Items)*l[0] + gp.quicksum(x[i]*c[i+n] for i in Items)*l[1]), GRB.MINIMIZE)
 
     m.optimize()
     
     #Remove Denominated Regions for J = 3
-    def deleteDominated(regions):
-        new_regions = []
-        for i in range(len(regions)):
-            i_dominated = [True]*(len(regions))
-            for j in range(len(regions)):
-              
-                for dim in range(len(regions[i])):
-                    if regions[i][dim] > regions[j][dim]:
-                        i_dominated[j] = False
-                        break
-            del i_dominated[i]
-            if not any(i_dominated):
-                new_regions.append(regions[i])
+    def deleteDominated(reg):
+        nondom = reg.copy()
+        for i in range(len(reg)):
+            for j in range(len(reg)): 
     
-        return(new_regions)
-        
+                if i == j:
+                    continue
+    
+                if reg[i][0]<= reg[j][0]:
+                    if reg[i][1] <= reg[j][1]:
+                        if reg[i][2] <= reg[j][2]:    
+                            nondom.remove(reg[i])
+                            break
+        return nondom
+    
     
     def optimize(region):
         
@@ -102,7 +102,7 @@ def Supernal(c,a,b,l):
                 j+=1
             
             z = []
-            for i in range(len(c_orig)):
+            for i in range(J):
                 z_temp = 0
                 for j in range(n):
                     z_temp += c_orig[i][j]*Mat[0][j]
@@ -115,13 +115,13 @@ def Supernal(c,a,b,l):
             if J == 2:
     
                 regions2.append([z[0]-1,region[1]])
-                regions2.append([region[0],z[1]-1])         
+                regions2.append([region[0],z[1]-1])        
                 
             if J == 3:
                 
                 regions2.append([z[0]-1,region[1],region[2]])
                 regions2.append([region[0],z[1]-1,region[2]])
-                regions2.append([region[0],region[1],z[2]-1])                        
+                regions2.append([region[0],region[1],z[2]-1])                     
                 
             return None
             
@@ -130,13 +130,7 @@ def Supernal(c,a,b,l):
         
     
     #While there are new regions to be processed in the next layer, continue
-    iterations = True
-    while iterations:
-        
-        #If no more regions to be process, end loop
-        if len(regions1) == 0:
-            iterations = False
-            break
+    while len(regions1) > 0:
         
         #iterate through all regions to be processed in current layer
         for r in range(len(regions1)):
@@ -148,6 +142,7 @@ def Supernal(c,a,b,l):
         
         elif J == 3:
             #Remove dominated regions from next processing layer
+
             regions1 = deleteDominated(regions2)
         
         #Count new regions
@@ -155,9 +150,10 @@ def Supernal(c,a,b,l):
         #Reset empty list of regions for the next processing level
         regions2 = []
         
+    ndf_final = NDF.copy() 
     if J == 2:
 
-        ndf_final = NDF.copy()       
+              
     
         for i in range(len(NDF)):
             for j in range(len(NDF)): 
@@ -165,8 +161,9 @@ def Supernal(c,a,b,l):
                 if i == j:
                     continue
         
-                if NDF[i][0]>= NDF[j][0] and NDF[i][1] >= NDF[j][1]:
-                    ndf_final.remove(NDF[i])
+                if NDF[i][0]>= NDF[j][0]:
+                    if NDF[i][1] >= NDF[j][1]:
+                        ndf_final.remove(NDF[i])
                     break
     
     return ndf_final, num_regions
